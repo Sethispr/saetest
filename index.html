@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>saelogy — Anime Card Rentals</title>
+  <meta name="theme-color" content="#0A0A0A">
+  <link rel="manifest" href="/manifest.json">
+  <style>
+    /* Prevent white flash on page load, especially on iOS Safari */
+    body {
+      background-color: #0A0A0A; /* Corresponds to Tailwind's bg-neutral-950 */
+    }
+  </style>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <!-- Additional preconnects for performance optimization -->
+  <link rel="preconnect" href="https://cdn.tailwindcss.com">
+  <link rel="preconnect" href="https://cdn.jsdelivr.net">
+  <link rel="preconnect" href="https://cdn.skypack.dev">
+  <link rel="preconnect" href="https://cdn.discordapp.com"> <!-- For card images -->
+  <link rel="preconnect" href="https://discord.com"> <!-- For Discord webhooks -->
+
+  <!-- Preload critical resources for faster initial load -->
+  <link rel="preload" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sora:wght@600;700;800&display=swap" as="style">
+  <link rel="preload" href="styles.css" as="style">
+  <link rel="preload" href="https://cdn.tailwindcss.com" as="script">
+  <link rel="modulepreload" href="https://cdn.skypack.dev/@radix-ui/colors">
+  <link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/dayjs@1.11.13/+esm">
+  <link rel="modulepreload" href="app.js">
+  <!-- LCP Image Preload: Anime Card 1, as requested -->
+  <link rel="preload" href="https://cdn.discordapp.com/attachments/945285845177491488/1413052677327294484/Avater.png?ex=68ba875b&is=68b935db&hm=9c84fbb9497fc1570798ef12250c339a8574a0e56d65d590410e79035e6a2da3" as="image">
+  <!-- Preload other critical hero images for optimal LCP -->
+  <link rel="preload" href="https://cdn.discordapp.com/attachments/945285845177491488/1413050380727615540/Avater.png?ex=68ba8537&is=68b933b7&hm=26f2a996db9121de35741da1dab76da6854eb08a6ec461122d0f454cdf8e8f14" as="image">
+  <link rel="preload" href="https://cdn.discordapp.com/attachments/1152403369546227863/1413082358466482358/Avater.png?ex=68baa300&is=68b95180&hm=0763870eb64f18a934b15999d5e462181078fa26ebcc6e98ff75b9af51d18a77" as="image">
+
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sora:wght@600;700;800&display=swap" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'ui-sans-serif', 'system-ui'],
+            display: ['Sora', 'ui-sans-serif', 'system-ui'],
+          },
+          colors: {
+            brand: {
+              DEFAULT: '#A5B4FC',
+              fg: '#E0E7FF',
+            },
+          },
+          boxShadow: {
+            soft: '0 1px 0 0 rgba(255,255,255,0.04) inset, 0 1px 2px rgba(0,0,0,0.2)',
+          },
+        },
+      },
+    }
+  </script>
+  <link rel="stylesheet" href="styles.css" />
+  
+  <script type="importmap">
+  {
+    "imports": {
+      "@radix-ui/colors": "https://cdn.skypack.dev/@radix-ui/colors",
+      "dayjs": "https://cdn.jsdelivr.net/npm/dayjs@1.11.13/+esm"
+    }
+  }
+  </script>
+</head>
+<body class="bg-neutral-950 text-neutral-200 antialiased font-sans selection:bg-neutral-800">
+  <div id="progress-bar" class="fixed top-0 left-0 h-1 w-0 z-[70]"></div>
+  <!-- New Reading Progress Bar -->
+  <div id="reading-progress-bar" class="fixed top-0 left-0 h-1 w-0 z-[69]"></div>
+  <header class="sticky top-0 z-40 border-b border-neutral-800/70 bg-neutral-950/70 backdrop-blur">
+    <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="h-8 w-8 rounded-md bg-neutral-900 grid place-items-center shadow-soft">
+          <span class="text-sm font-semibold text-white">SL</span>
+        </div>
+        <span class="font-display text-xl tracking-tight saelogy-gradient-text">saelogy</span>
+        <span class="ml-2 mr-1 md:mr-0 rounded-full border border-neutral-800 px-2 py-0.5 text-[10px] uppercase tracking-wide text-neutral-400">Beta</span>
+      </div>
+      <nav class="hidden md:flex items-center gap-6 text-sm">
+        <a href="#catalog" class="text-neutral-300 hover:text-white transition-colors">Catalog</a>
+        <a href="#how-it-works" class="text-neutral-300 hover:text-white transition-colors">How it works</a>
+        <a href="#faq" class="text-neutral-300 hover:text-white transition-colors">FAQ</a>
+      </nav>
+      <div class="flex items-center gap-3">
+        <button id="open-cart" class="inline-flex items-center gap-2 rounded-md border border-neutral-800 bg-neutral-900 px-3.5 py-2 text-sm text-neutral-200 shadow-soft hover:bg-neutral-800/80 active:scale-[0.99] transition">
+          <span id="cart-count">Cart (0)</span>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="opacity-80"><circle cx="9" cy="21" r="1"></circle><circle cx="20" cy="21" r="1"></circle><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6"></path></svg>
+        </button>
+        <button id="open-rentals" class="inline-flex items-center gap-2 rounded-md border border-neutral-800 bg-neutral-900 px-3.5 py-2 text-sm text-neutral-200 shadow-soft hover:bg-neutral-800/80 active:scale-[0.99] transition">
+          <span>My Rentals</span>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M3 7h18M3 12h18M3 17h18" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section class="border-b border-neutral-900 bg-neutral-950 relative overflow-hidden">
+      
+      <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-14 relative z-10">
+        <div class="grid md:grid-cols-2 gap-10 items-center">
+          <div>
+            <h1 class="font-display text-4xl sm:text-5xl md:text-6xl text-white leading-normal">
+              <span class="hero-title-word">Rent</span>
+              <span class="hero-title-word">mythic</span>
+              <span class="hero-title-word">and</span>
+              <span class="hero-title-word">starlight</span>
+              <span class="hero-title-word">cards</span>
+              <span class="hero-title-word">from</span>
+              <span class="saelogy-gradient-text hero-title-word">saelogy</span>
+            </h1>
+            <p class="mt-4 text-neutral-400 max-w-2xl">
+              Saelogy clan members are free from fees or collat! Do note that all card rental requests are not always approved. You can see your request in the web and at our <a href="https://discord.com/channels/1069706838452473887/1367438107292729444" target="_blank" rel="noopener noreferrer" class="text-brand hover:text-white transition-colors">#◜🍡﹒card-rent</a> channel.
+            </p>
+            <div class="mt-6 flex items-center gap-3">
+              <a href="#catalog" class="inline-flex items-center gap-2 rounded-md border border-neutral-800 bg-white/5 px-4 py-2.5 text-sm text-neutral-100 shadow-soft hover:bg-white/[0.08] transition">
+                Explore Catalog
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+              </a>
+              <button id="cta-random" class="inline-flex items-center gap-2 rounded-md bg-neutral-100 text-neutral-900 px-4 py-2.5 text-sm font-medium hover:bg-white transition">
+                Surprise me
+              </button>
+            </div>
+            <div class="mt-6 flex gap-4 text-xs text-neutral-500">
+              <span>All prices dynamic</span>
+              <span aria-hidden="true">•</span>
+              <span>Secure collat</span>
+              <span aria-hidden="true">•</span>
+              <span>Verified owners</span>
+            </div>
+          </div>
+          <div class="relative">
+            <div class="absolute -inset-4 rounded-2xl bg-[radial-gradient(60%_60%_at_50%_0%,rgba(255,255,255,0.06),transparent)] pointer-events-none"></div>
+            <!-- New 3-card graphic for hero section -->
+            <div class="relative mx-auto w-full max-w-sm aspect-[4/3] flex items-center justify-center cards-3d-container">
+              <!-- Left card, slightly slanted -->
+              <div class="absolute w-[60%] h-[90%] left-[-10%] top-1/2 rounded-xl overflow-hidden z-10 shadow-xl hero-card-item hero-card-left">
+                <img src="https://cdn.discordapp.com/attachments/945285845177491488/1413052677327294484/Avater.png?ex=68ba875b&is=68b935db&hm=9c84fbb9497fc1570798ef12250c339a8574a0e56d65d590410e79035e6a2da3" alt="Anime Card 1" class="w-full h-full object-contain" fetchpriority="high">
+              </div>
+              <!-- Middle card, prominent -->
+              <div class="absolute w-[75%] h-full left-1/2 top-0 rounded-xl overflow-hidden z-20 hero-card-item hero-card-middle">
+                <img src="https://cdn.discordapp.com/attachments/945285845177491488/1413050380727615540/Avater.png?ex=68ba8537&is=68b933b7&hm=26f2a996db9121de35741da1dab76da6854eb08a6ec461122d0f454cdf8e8f14" alt="Anime Card 2" class="w-full h-full object-contain" fetchpriority="high">
+              </div>
+              <!-- Right card, slightly slanted -->
+              <div class="absolute w-[60%] h-[90%] right-[-10%] top-1/2 rounded-xl overflow-hidden z-10 shadow-xl hero-card-item hero-card-right">
+                <img src="https://cdn.discordapp.com/attachments/1152403369546227863/1413082358466482358/Avater.png?ex=68baa300&is=68b95180&hm=0763870eb64f18a934b15999d5e462181078fa26ebcc6e98ff75b9af51d18a77" alt="Anime Card 3" class="w-full h-full object-contain" fetchpriority="high">
+              </div>
+            </div>
+            <!-- End of new 3-card graphic -->
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="catalog" class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-12">
+      <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div>
+          <h2 class="font-display text-2xl text-white">Catalog</h2>
+          <p class="text-sm text-neutral-400 mt-1">Filter by element, rarity and name.</p>
+        </div>
+        <div class="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
+          <div class="relative flex-1 sm:w-80">
+            <svg class="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-neutral-500" viewBox="0 0 24 24" fill="none"><path d="M21 21l-4.3-4.3M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <input id="search" type="text" placeholder="Search cards…" class="w-full pl-9 pr-24 py-2.5 rounded-md bg-neutral-900 border border-neutral-800 text-neutral-200 placeholder-neutral-500 outline-none focus:ring-2 focus:ring-neutral-700/60" />
+            
+            <!-- Clear search button -->
+            <button id="clear-search-btn" class="absolute right-16 top-1/2 -translate-y-1/2 text-neutral-500 hover:text-white search-fade-out" aria-label="Clear search input">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            </button>
+
+            <!-- Shortcut key -->
+            <kbd id="search-shortcut" class="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-500 text-xs tracking-wide rounded border border-neutral-700 px-1.5 py-0.5 pointer-events-none hidden sm:inline-flex items-center gap-0.5 search-fade-in">
+              <span class="sr-only">Press ⌘K to search</span>
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                <line x1="12" y1="3" x2="12" y2="21"></line>
+                <line x1="3" y1="12" x2="21" y2="12"></line>
+              </svg>
+              <span>K</span>
+            </kbd>
+
+            <div id="suggestions" class="absolute left-0 right-0 top-full mt-2 search-fade-out"></div>
+          </div>
+          <div class="flex gap-2">
+            <select id="rarity" class="rounded-md bg-neutral-900 border border-neutral-800 text-sm px-3 py-2 text-neutral-200 focus:ring-2 focus:ring-neutral-700/60">
+              <option value="">All rarities</option>
+              <option value="Mythic">Mythic</option>
+              <option value="Starlight">Starlight</option>
+            </select>
+            <button id="clear-filters" class="rounded-md border border-neutral-800 px-3 py-2 text-sm text-neutral-300 hover:bg-neutral-900">Reset</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="element-filters" class="flex flex-wrap items-center gap-2 mt-4">
+        <!-- Tags injected by JS -->
+      </div>
+
+      <div id="grid" class="mt-8 grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
+        <!-- Cards injected by JS -->
+      </div>
+
+      <div id="empty-state" class="hidden mt-16 text-center text-neutral-500">
+        Nothing found. Try adjusting filters.
+      </div>
+    </section>
+
+    <section id="how-it-works" class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-16 border-t border-neutral-900">
+      <h3 class="font-display text-xl text-white mb-6">How it works</h3>
+      <ol class="grid sm:grid-cols-3 gap-6 text-sm">
+        <li class="relative rounded-lg border border-neutral-800 bg-neutral-900 p-6 shadow-soft group hover:border-brand/40 transition-colors duration-200">
+          <div class="absolute inset-0 rounded-lg pointer-events-none group-hover:bg-neutral-800/20 transition-colors duration-200"></div>
+          <div class="relative z-10">
+            <div class="text-brand mb-3">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="11" cy="11" r="8"></circle>
+                <path d="m21 21-4.3-4.3"></path>
+              </svg>
+            </div>
+            <h4 class="font-medium text-neutral-100 mb-1">Browse & Discover</h4>
+            <p class="text-neutral-400">Explore our catalog of mythic and starlight cards. Filter by rarity, element, or search by name.</p>
+          </div>
+        </li>
+        <li class="relative rounded-lg border border-neutral-800 bg-neutral-900 p-6 shadow-soft group hover:border-brand/40 transition-colors duration-200">
+          <div class="absolute inset-0 rounded-lg pointer-events-none group-hover:bg-neutral-800/20 transition-colors duration-200"></div>
+          <div class="relative z-10">
+            <div class="text-brand mb-3">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M8 2v4"></path>
+                <path d="M16 2v4"></path>
+                <rect x="3" y="4" width="18" height="18" rx="2"></rect>
+                <path d="M3 10h18"></path>
+              </svg>
+            </div>
+            <h4 class="font-medium text-neutral-100 mb-1">Select Dates & Confirm</h4>
+            <p class="text-neutral-400">Choose your desired rental period and confirm the details for your selected card(s).</p>
+          </div>
+        </li>
+        <li class="relative rounded-lg border border-neutral-800 bg-neutral-900 p-6 shadow-soft group hover:border-brand/40 transition-colors duration-200">
+          <div class="absolute inset-0 rounded-lg pointer-events-none group-hover:bg-neutral-800/20 transition-colors duration-200"></div>
+          <div class="relative z-10">
+            <div class="text-brand mb-3">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M9 11l3 3L22 4"></path>
+                <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7"></path>
+              </svg>
+            </div>
+            <h4 class="font-medium text-neutral-100 mb-1">Receive & Manage</h4>
+            <p class="text-neutral-400">Get confirmation and track your rentals directly through our website and Discord channel.</p>
+          </div>
+        </li>
+      </ol>
+    </section>
+
+    <section id="faq" class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-16 border-t border-neutral-900">
+      <h3 class="font-display text-xl text-white mb-6">FAQ</h3>
+      <div id="faq-accordion" class="space-y-4">
+        <div class="faq-item border border-neutral-800 rounded-lg overflow-hidden">
+          <button class="faq-trigger flex items-center justify-between w-full p-5 text-left text-neutral-100 font-medium bg-neutral-900 hover:bg-neutral-800 transition-colors" aria-expanded="false">
+            <span class="flex items-center gap-3">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="text-brand flex-shrink-0">
+                <circle cx="12" cy="12" r="10"></circle>
+                <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+                <path d="M12 17h.01"></path>
+              </svg>
+              Are all cards verified?
+            </span>
+            <svg class="faq-chevron w-5 h-5 text-neutral-400 transition-transform duration-200 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="m6 9 6 6 6-6"></path>
+            </svg>
+          </button>
+          <div class="faq-content h-0 overflow-hidden bg-neutral-900/50">
+            <div class="p-5 pt-4 text-neutral-400">
+              <p>Yes, each listing is verified and categorized by element and rarity. We ensure all cards meet our quality standards before being available for rental.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="faq-item border border-neutral-800 rounded-lg overflow-hidden">
+          <button class="faq-trigger flex items-center justify-between w-full p-5 text-left text-neutral-100 font-medium bg-neutral-900 hover:bg-neutral-800 transition-colors" aria-expanded="false">
+            <span class="flex items-center gap-3">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="text-brand flex-shrink-0">
+                <circle cx="12" cy="12" r="10"></circle>
+                <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+                <path d="M12 17h.01"></path>
+              </svg>
+              What are the rarities available?
+            </span>
+            <svg class="faq-chevron w-5 h-5 text-neutral-400 transition-transform duration-200 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="m6 9 6 6 6-6"></path>
+            </svg>
+          </button>
+          <div class="faq-content h-0 overflow-hidden bg-neutral-900/50">
+            <div class="p-5 pt-4 text-neutral-400">
+              <p>We offer two primary rarities: Mythic and Starlight. Starlight cards are denoted with a star icon.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="faq-item border border-neutral-800 rounded-lg overflow-hidden">
+          <button class="faq-trigger flex items-center justify-between w-full p-5 text-left text-neutral-100 font-medium bg-neutral-900 hover:bg-neutral-800 transition-colors" aria-expanded="false">
+            <span class="flex items-center gap-3">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="text-brand flex-shrink-0">
+                <circle cx="12" cy="12" r="10"></circle>
+                <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+                <path d="M12 17h.01"></path>
+              </svg>
+              How are rental prices determined?
+            </span>
+            <svg class="faq-chevron w-5 h-5 text-neutral-400 transition-transform duration-200 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="m6 9 6 6 6-6"></path>
+            </svg>
+          </button>
+          <div class="faq-content h-0 overflow-hidden bg-neutral-900/50">
+            <div class="p-5 pt-4 text-neutral-400">
+              <p>All rental prices are dynamic and are calculated based on card rarity, demand, and duration. You can see the daily rate on each card listing.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="faq-item border border-neutral-800 rounded-lg overflow-hidden">
+          <button class="faq-trigger flex items-center justify-between w-full p-5 text-left text-neutral-100 font-medium bg-neutral-900 hover:bg-neutral-800 transition-colors" aria-expanded="false">
+            <span class="flex items-center gap-3">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="text-brand flex-shrink-0">
+                <circle cx="12" cy="12" r="10"></circle>
+                <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+                <path d="M12 17h.01"></path>
+              </svg>
+              Can I extend a rental?
+            </span>
+            <svg class="faq-chevron w-5 h-5 text-neutral-400 transition-transform duration-200 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="m6 9 6 6 6-6"></path>
+            </svg>
+          </button>
+          <div class="faq-content h-0 overflow-hidden bg-neutral-900/50">
+            <div class="p-5 pt-4 text-neutral-400">
+              <p>For extended rental periods beyond the initial checkout, please contact the card owner directly via Discord after your initial rental is confirmed.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Details Modal -->
+  <dialog id="details-dialog" class="z-50">
+    <div id="details-dialog-content" class="fixed bottom-0 right-0 top-0 h-full w-full max-w-md border-l border-neutral-800 bg-neutral-950 text-neutral-200 shadow-2xl p-5 flex flex-col">
+      <div class="flex items-center justify-between border-b border-neutral-900 pb-4">
+        <span class="font-display text-lg" id="details-title">Details</span>
+        <button id="close-details" class="rounded-md p-1.5 hover:bg-neutral-900" aria-label="Close">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6 6 18" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+      </div>
+      <div id="details-body" class="mt-4 flex-grow overflow-y-auto">
+        <!-- Details content injected here -->
+      </div>
+    </div>
+  </dialog>
+
+  <!-- Checkout Modal (formerly Rent Modal, now handles multiple cards) -->
+  <dialog id="checkout-dialog" class="rounded-xl border border-neutral-800 bg-neutral-950 text-neutral-200 w-[95vw] max-w-md shadow-2xl">
+    <div class="p-5 border-b border-neutral-900 flex items-center justify-between">
+      <span class="font-display text-lg" id="checkout-title">Your Cart</span>
+      <button id="close-checkout" class="rounded-md p-1.5 hover:bg-neutral-900" aria-label="Close">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6 6 18" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+    </div>
+    <div class="p-5 space-y-4">
+      <div id="cart-items-list" class="space-y-4 max-h-80 overflow-y-auto hide-scrollbar">
+        <!-- Cart items injected here -->
+      </div>
+      <div class="flex justify-between items-center text-lg font-medium border-t border-neutral-800 pt-4">
+        <span>Total:</span>
+        <span id="cart-grand-total">0 coins</span>
+      </div>
+      <div class="space-y-3">
+        <label class="text-sm">
+          <span class="block mb-1 text-neutral-400">Discord username</span>
+          <input id="discord" type="text" placeholder="e.g. user#0001" class="w-full rounded-md bg-neutral-900 border border-neutral-800 px-3 py-2.5 h-10 focus:ring-2 focus:ring-neutral-700/60" required />
+        </label>
+        <label class="text-sm">
+          <span class="block mb-1 text-neutral-400">Reason</span>
+          <select id="reason" class="w-full rounded-md bg-neutral-900 border border-neutral-800 px-3 py-2.5 h-10 focus:ring-2 focus:ring-neutral-700/60">
+            <option value="flooring">Flooring</option>
+            <option value="raid">Raid</option>
+            <option value="dungeon">Dungeon</option>
+            <option value="tourney">Tourney</option>
+            <option value="other">Other</option>
+          </select>
+        </label>
+      </div>
+      <button id="confirm-checkout" class="w-full inline-flex items-center justify-center gap-2 rounded-md bg-neutral-100 text-neutral-900 px-4 py-2.5 text-sm font-medium hover:bg-white transition">
+        Confirm rental(s)
+      </button>
+    </div>
+  </dialog>
+
+  <!-- Rentals Drawer -->
+  <dialog id="rentals-drawer" class="w-[95vw] max-w-lg rounded-xl border border-neutral-800 bg-neutral-950 text-neutral-200 shadow-2xl">
+    <div class="p-5 border-b border-neutral-900 flex items-center justify-between">
+      <span class="font-display text-lg">My Rentals</span>
+      <button id="close-rentals" class="rounded-md p-1.5 hover:bg-neutral-900" aria-label="Close">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6 6 18" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+    </div>
+    <div id="rentals-list" class="p-5 space-y-3 text-sm">
+      <!-- Filled by JS -->
+    </div>
+  </dialog>
+
+  <!-- Custom Calendar Dialog -->
+  <dialog id="calendar-dialog" class="rounded-xl border border-neutral-800 bg-neutral-950 text-neutral-200 w-[95vw] max-w-sm shadow-2xl">
+    <div class="p-5 border-b border-neutral-900 flex items-center justify-between">
+      <h3 class="font-display text-lg">Select Date</h3>
+      <button id="close-calendar" class="rounded-md p-1.5 hover:bg-neutral-900" aria-label="Close calendar">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6 6 18" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+    </div>
+    <div class="p-5">
+      <div id="calendar-header" class="flex items-center justify-between mb-4">
+        <button id="calendar-prev-month" class="p-2 rounded-md hover:bg-neutral-900 text-neutral-400 hover:text-white transition-colors">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+        </button>
+        <span id="calendar-month-year" class="font-medium text-lg text-neutral-100"></span>
+        <button id="calendar-next-month" class="p-2 rounded-md hover:bg-neutral-900 text-neutral-400 hover:text-white transition-colors">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+        </button>
+      </div>
+      <div id="calendar-weekdays" class="grid grid-cols-7 text-center text-xs font-medium text-neutral-500 mb-2">
+        <span>Su</span><span>Mo</span><span>Tu</span><span>We</span><span>Th</span><span>Fr</span><span>Sa</span>
+      </div>
+      <div id="calendar-days" class="grid grid-cols-7 text-center text-sm">
+        <!-- Days will be dynamically generated here -->
+      </div>
+    </div>
+  </dialog>
+
+  <!-- Image Zoom Dialog -->
+  <dialog id="image-zoom-dialog" class="rounded-xl border border-neutral-800 bg-transparent text-neutral-200 shadow-2xl p-0 overflow-hidden w-[95vw] max-w-4xl flex items-center justify-center">
+    <img id="image-zoom-img" src="" alt="Zoomed card image" class="max-w-full max-h-full object-contain transform scale-0 opacity-0 transition-all duration-300 ease-out">
+  </dialog>
+
+  <!-- Toasts -->
+  <div id="toasts" class="fixed bottom-4 right-4 space-y-2 z-[60]"></div>
+
+  <script type="module" src="app.js"></script>
+  <!-- Flatpickr JavaScript -->
+  
+</body>
+</html>
