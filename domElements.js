@@ -36,7 +36,7 @@ export const getDomElements = () => ({
     cartCountSpan: document.getElementById("cart-count"),
 
     progressBar: document.getElementById("progress-bar"),
-    readingProgressBar: document.getElementById("reading-progress-bar"), // New element for reading progress
+    readingProgressBar: document.getElementById("reading-progress-bar"), // Element for reading progress
 
     calendarDialog: document.getElementById("calendar-dialog"),
     closeCalendarBtn: document.getElementById("close-calendar"),
@@ -47,7 +47,13 @@ export const getDomElements = () => ({
 
     faqAccordion: document.getElementById("faq-accordion"),
 
-    // New: Image Zoom Dialog elements
+    // Image Zoom Dialog elements
     imageZoomDialog: document.getElementById("image-zoom-dialog"),
     imageZoomImg: document.getElementById("image-zoom-img"),
+
+    // Rarity Filter UI elements
+    rarityFilterContainer: document.getElementById("rarity-filter-container"),
+    rarityFilterTrigger: document.getElementById("rarity-filter-trigger"),
+    rarityFilterContent: document.getElementById("rarity-filter-content"),
+    rarityFilterBadge: document.getElementById("rarity-filter-badge"),
 });
