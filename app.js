@@ -1,4 +1,3 @@
-import dayjs from "dayjs";
 import { getDomElements } from "./domElements.js";
 import { data, ELEMENTS } from "./data.js";
 import { getAppState, setQuery, setRarity, toggleElementFilter, resetFilters, addToCart, getCartItems, setCurrentCalendarMonth, getCalendarState } from "./state.js";
@@ -17,21 +16,41 @@ function updateReadingProgressBar() {
   const { readingProgressBar } = D;
   if (!readingProgressBar) return; // Safeguard if element not found
 
-  // Calculate the total scrollable height of the document
-  const documentHeight = document.documentElement.scrollHeight;
-  const viewportHeight = document.documentElement.clientHeight;
-  const scrollableHeight = documentHeight - viewportHeight;
+  // Batch layout reads and writes in a rAF to avoid forced reflows
+  window.requestAnimationFrame(() => {
+    // Read layout once
+    const docEl = document.documentElement;
+    const documentHeight = docEl.scrollHeight;
+    const viewportHeight = docEl.clientHeight;
+    const scrolled = docEl.scrollTop;
 
-  // Get the current vertical scroll position
-  const scrolled = document.documentElement.scrollTop;
+    const scrollableHeight = documentHeight - viewportHeight;
+    let progress = 0;
+    if (scrollableHeight > 0) {
+      progress = (scrolled / scrollableHeight) * 100;
+    }
 
-  let progress = 0;
-  if (scrollableHeight > 0) { // Avoid division by zero if content is not scrollable
-    progress = (scrolled / scrollableHeight) * 100;
+    // Only update style if changed to avoid unnecessary layout work
+    const newWidth = `${progress}%`;
+    if (readingProgressBar.style.width !== newWidth) {
+      readingProgressBar.style.width = newWidth;
+    }
+  });
+}
+
+// Helper function to update search button visibility based on input content
+function updateSearchButtonVisibility() {
+  if (D.searchInput.value.length > 0) {
+    D.clearSearchBtn.classList.remove("search-fade-out");
+    D.clearSearchBtn.classList.add("search-fade-in");
+    D.searchShortcutKbd.classList.add("search-fade-out");
+    D.searchShortcutKbd.classList.remove("search-fade-in");
+  } else {
+    D.clearSearchBtn.classList.add("search-fade-out");
+    D.clearSearchBtn.classList.remove("search-fade-in");
+    D.searchShortcutKbd.classList.remove("search-fade-out");
+    D.searchShortcutKbd.classList.add("search-fade-in");
   }
-
-  // Update the width of the reading progress bar
-  readingProgressBar.style.width = `${progress}%`;
 }
 
 function updateActiveSuggestion(newIndex) {
@@ -93,8 +112,7 @@ D.searchInput.addEventListener("keydown", (e) => {
           renderCatalogGrid();
           D.suggestionsContainer.classList.add("search-fade-out"); // Use new class
           D.suggestionsContainer.classList.remove("search-fade-in"); // Remove active class
-          D.clearSearchBtn.classList.remove("search-fade-out"); // Show clear button
-          D.clearSearchBtn.classList.add("search-fade-in");
+          updateSearchButtonVisibility(); // Update button visibility after Enter
         }
       }
     } else if (e.key === "Escape") {
@@ -116,18 +134,7 @@ D.searchInput.addEventListener("input", (e) => {
   activeSuggestionIndex = -1; 
   renderCatalogGrid(); 
 
-  // Show/hide clear button and search shortcut
-  if (currentValue.length > 0) {
-    D.clearSearchBtn.classList.remove("search-fade-out");
-    D.clearSearchBtn.classList.add("search-fade-in");
-    D.searchShortcutKbd.classList.add("search-fade-out");
-    D.searchShortcutKbd.classList.remove("search-fade-in");
-  } else {
-    D.clearSearchBtn.classList.add("search-fade-out");
-    D.clearSearchBtn.classList.remove("search-fade-in");
-    D.searchShortcutKbd.classList.remove("search-fade-out");
-    D.searchShortcutKbd.classList.add("search-fade-in");
-  }
+  updateSearchButtonVisibility(); // Call new function
 });
 
 D.searchInput.addEventListener("focus", () => {
@@ -155,14 +162,29 @@ D.raritySelect.addEventListener("change", (e) => {
 D.clearFiltersBtn.addEventListener("click", () => {
   resetFilters();
   D.searchInput.value = "";
-  D.raritySelect.value = "";
-  renderElementFilterButtons(); 
+  
+  // Reset new rarity filter UI
+  const rarityOptions = D.rarityFilterContent.querySelectorAll('.filter-popover-item');
+  rarityOptions.forEach(item => {
+    item.removeAttribute('data-state');
+  });
+  D.raritySelect.value = ""; // Reset the hidden select
+  setRarity(""); // Also update state directly
+  D.rarityFilterBadge.classList.add('hidden');
+  D.rarityFilterBadge.textContent = '0';
+  if (D.rarityFilterTrigger) { // Safeguard in case trigger is not yet available
+    D.rarityFilterTrigger.querySelector('i').style.transform = 'rotate(0deg)'; // Reset chevron rotation
+  }
+  // Ensure "All rarities" is visually selected if that's the default behavior
+  const allRaritiesOption = D.rarityFilterContent.querySelector('.filter-popover-item[data-value=""]');
+  if (allRaritiesOption) {
+    allRaritiesOption.setAttribute('data-state', 'selected');
+  }
+
+  renderElementFilterButtons(); // This will now re-render buttons AND re-attach their listeners
   renderCatalogGrid(); 
   renderSearchSuggestions(); 
-  D.clearSearchBtn.classList.add("search-fade-out"); // Hide clear button when filters are cleared
-  D.clearSearchBtn.classList.remove("search-fade-in");
-  D.searchShortcutKbd.classList.remove("search-fade-out"); // Show shortcut
-  D.searchShortcutKbd.classList.add("search-fade-in");
+  updateSearchButtonVisibility(); 
 });
 
 // New listener for the clear search input button
@@ -171,10 +193,7 @@ D.clearSearchBtn.addEventListener("click", () => {
   setQuery("");
   renderCatalogGrid();
   renderSearchSuggestions();
-  D.clearSearchBtn.classList.add("search-fade-out"); // Hide clear button
-  D.clearSearchBtn.classList.remove("search-fade-in");
-  D.searchShortcutKbd.classList.remove("search-fade-out"); // Show shortcut
-  D.searchShortcutKbd.classList.add("search-fade-in");
+  updateSearchButtonVisibility(); // Call new function
   D.searchInput.focus(); // Keep focus on search bar for convenience
 });
 
@@ -187,17 +206,102 @@ D.confirmCheckoutBtn.addEventListener("click", handleConfirmCheckout);
 
 D.calendarPrevMonthBtn.addEventListener("click", () => {
   const { currentDate } = getCalendarState();
-  setCurrentCalendarMonth(currentDate.subtract(1, 'month'));
+  const newDate = new Date(currentDate);
+  newDate.setMonth(newDate.getMonth() - 1); // Subtract one month
+  setCurrentCalendarMonth(newDate);
   renderCalendarView(handleDateClick); 
 });
 
 D.calendarNextMonthBtn.addEventListener("click", () => {
   const { currentDate } = getCalendarState();
-  setCurrentCalendarMonth(currentDate.add(1, 'month'));
+  const newDate = new Date(currentDate);
+  newDate.setMonth(newDate.getMonth() + 1); // Add one month
+  setCurrentCalendarMonth(newDate);
   renderCalendarView(handleDateClick); 
 });
 
 D.closeCalendarBtn.addEventListener("click", closeCalendarModal);
+
+// Rarity Filter Popover Logic
+// Check if rarityFilterTrigger and rarityFilterContent exist before attaching listeners
+if (D.rarityFilterTrigger && D.rarityFilterContent) {
+  const rarityTrigger = D.rarityFilterTrigger;
+  const rarityContent = D.rarityFilterContent;
+  const rarityOptions = D.rarityFilterContent.querySelectorAll('.filter-popover-item');
+
+  const openRarityPopover = () => {
+    rarityContent.classList.add('popover-open');
+    rarityTrigger.setAttribute('aria-expanded', 'true');
+    const chevronIcon = rarityTrigger.querySelector('i');
+    if (chevronIcon) {
+      chevronIcon.style.transform = 'rotate(180deg)'; // Rotate chevron
+    }
+  };
+
+  const closeRarityPopover = () => {
+    rarityContent.classList.remove('popover-open');
+    rarityTrigger.setAttribute('aria-expanded', 'false');
+    const chevronIcon = rarityTrigger.querySelector('i');
+    if (chevronIcon) {
+      chevronIcon.style.transform = 'rotate(0deg)'; // Reset chevron
+    }
+  };
+
+  rarityTrigger.addEventListener('click', (e) => {
+    e.stopPropagation(); // Prevent document click listener from immediately closing
+    if (rarityTrigger.getAttribute('aria-expanded') === 'true') {
+      closeRarityPopover();
+    } else {
+      openRarityPopover();
+    }
+  });
+
+  rarityOptions.forEach(option => {
+    option.addEventListener('click', (e) => {
+      e.stopPropagation(); // Prevent document click listener from immediately closing
+      const value = option.dataset.value;
+      const isSelected = option.getAttribute('data-state') === 'selected';
+
+      // Clear all selections first
+      rarityOptions.forEach(opt => opt.removeAttribute('data-state'));
+      
+      let selectedRarity = '';
+      if (!isSelected) { // If the clicked option was not previously selected
+        option.setAttribute('data-state', 'selected');
+        selectedRarity = value;
+        if (value) { // Only show badge if a specific rarity (not "All rarities") is selected
+          D.rarityFilterBadge.textContent = '1';
+          D.rarityFilterBadge.classList.remove('hidden');
+        } else {
+          D.rarityFilterBadge.classList.add('hidden'); // Hide badge for "All rarities"
+          D.rarityFilterBadge.textContent = '0';
+        }
+      } else { // If the clicked option was already selected, keep it selected (single select)
+        option.setAttribute('data-state', 'selected'); // Re-apply selected state
+        selectedRarity = value;
+        if (value) {
+            D.rarityFilterBadge.textContent = '1';
+            D.rarityFilterBadge.classList.remove('hidden');
+        } else {
+            D.rarityFilterBadge.classList.add('hidden');
+            D.rarityFilterBadge.textContent = '0';
+        }
+      }
+      
+      D.raritySelect.value = selectedRarity; 
+      setRarity(selectedRarity);
+      renderCatalogGrid();
+      closeRarityPopover();
+    });
+  });
+
+  // Close popover when clicking outside
+  document.addEventListener('click', (e) => {
+    if (D.rarityFilterContainer && !D.rarityFilterContainer.contains(e.target)) {
+      closeRarityPopover();
+    }
+  });
+}
 
 // Initial renders
 document.addEventListener("DOMContentLoaded", () => {
@@ -214,7 +318,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  renderElementFilterButtons();
+  renderElementFilterButtons(); // This call now handles initial rendering and event attachment
   renderCatalogGrid();
   renderSearchSuggestions();
   updateCartDisplayCount();
@@ -225,26 +329,7 @@ document.addEventListener("DOMContentLoaded", () => {
   window.addEventListener('scroll', throttle(updateReadingProgressBar, 100)); // Update on scroll, throttled
 
   // Initial state for clear button based on search input value
-  if (D.searchInput.value.length > 0) {
-    D.clearSearchBtn.classList.remove("search-fade-out");
-    D.clearSearchBtn.classList.add("search-fade-in");
-    D.searchShortcutKbd.classList.add("search-fade-out");
-    D.searchShortcutKbd.classList.remove("search-fade-in");
-  } else {
-    D.clearSearchBtn.classList.add("search-fade-out");
-    D.clearSearchBtn.classList.remove("search-fade-in");
-    D.searchShortcutKbd.classList.remove("search-fade-out");
-    D.searchShortcutKbd.classList.add("search-fade-in");
-  }
-
-  // Re-attach listeners for element filter buttons
-  D.elementFilters.querySelectorAll(".element-tag").forEach(btn => {
-    btn.addEventListener("click", () => {
-      toggleElementFilter(btn.dataset.element);
-      btn.dataset.state = getAppState().elements[btn.dataset.element]; // Update dataset state immediately for visual
-      renderCatalogGrid();
-    });
-  });
+  updateSearchButtonVisibility(); // Call new function here
 
   // FAQ Accordion
   D.faqAccordion.querySelectorAll('.faq-item').forEach(item => {
@@ -260,22 +345,82 @@ document.addEventListener("DOMContentLoaded", () => {
         const otherContent = otherItem.querySelector('.faq-content');
         if (otherTrigger !== trigger && otherTrigger.getAttribute('aria-expanded') === 'true') {
           otherTrigger.setAttribute('aria-expanded', 'false');
-          otherContent.style.height = '0px'; // Collapse others
+          // read height once and then write to collapse
+          otherContent.style.height = '0px'; // Collapse others (write only)
         }
       });
 
       // Toggle current item
       trigger.setAttribute('aria-expanded', !isExpanded);
       if (!isExpanded) {
-        content.style.height = `${content.scrollHeight}px`; // Expand
+        // Read scrollHeight once into a variable (single layout read), then write height
+        const targetHeight = content.scrollHeight;
+        content.style.height = `${targetHeight}px`; // Expand (write only)
       } else {
-        content.style.height = '0px'; // Collapse
+        content.style.height = '0px'; // Collapse (write only)
       }
     });
 
     // Set initial height to 0 for collapsing
     content.style.height = '0px';
   });
+
+  // Global Keyboard Shortcuts
+  document.addEventListener('keydown', (e) => {
+    // Check if an input field, textarea, or select is currently focused
+    const isInputFieldFocused = document.activeElement.tagName === 'INPUT' ||
+                                document.activeElement.tagName === 'TEXTAREA' ||
+                                document.activeElement.tagName === 'SELECT';
+
+    // Cmd/Ctrl + K for search
+    if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+      e.preventDefault(); // Prevent browser's default search shortcut
+      D.searchInput.focus();
+      D.searchInput.select(); // Select existing text if any
+      renderSearchSuggestions(); // Ensure suggestions are visible
+      updateSearchButtonVisibility(); // Update clear/shortcut buttons
+    } 
+    // Only process other shortcuts if no input field is focused
+    else if (!isInputFieldFocused) {
+      // Check if any dialog is open to prevent opening cart/rentals over another dialog
+      const anyDialogIsOpen = D.checkoutDialog.open || D.detailsDialog.open || D.rentalsDrawer.open || D.calendarDialog.open || D.imageZoomDialog.open;
+
+      if (e.key === 'c' || e.key === 'C') {
+        e.preventDefault();
+        if (!anyDialogIsOpen) { // Only open if no other dialogs are open
+          openCheckoutModal();
+        } else if (D.checkoutDialog.open) { // If it is the cart dialog and it's open, close it
+          closeCheckoutModal(); 
+        }
+      } else if (e.key === 'r' || e.key === 'R') {
+        e.preventDefault();
+        if (!anyDialogIsOpen) { // Only open if no other dialogs are open
+          openRentalsDrawer();
+        } else if (D.rentalsDrawer.open) { // If it is the rentals dialog and it's open, close it
+          closeRentalsDrawer(); 
+        }
+      }
+    }
+  });
+
+  // Initialize the rarity filter's visual state
+  if (D.rarityFilterTrigger && D.rarityFilterContent) { // Ensure elements exist
+    const currentRarity = getAppState().rarity;
+    if (currentRarity) {
+      const selectedOption = D.rarityFilterContent.querySelector(`.filter-popover-item[data-value="${currentRarity}"]`);
+      if (selectedOption) {
+        selectedOption.setAttribute('data-state', 'selected');
+        D.rarityFilterBadge.textContent = '1';
+        D.rarityFilterBadge.classList.remove('hidden');
+      }
+    } else {
+      // Default to "All rarities" selected visually if no rarity is active
+      const allRaritiesOption = D.rarityFilterContent.querySelector('.filter-popover-item[data-value=""]');
+      if (allRaritiesOption) {
+        allRaritiesOption.setAttribute('data-state', 'selected');
+      }
+    }
+  }
 });
 
 D.ctaRandomBtn.addEventListener("click", () => {
