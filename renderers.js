@@ -1,4 +1,3 @@
-import dayjs from "dayjs";
 import { getDomElements } from "./domElements.js";
 import { data, ELEMENTS } from "./data.js";
 import { 
@@ -10,7 +9,8 @@ import {
   addToCart, 
   updateCartItemDetails, 
   removeFromCart, 
-  removeRentalById 
+  removeRentalById,
+  toggleElementFilter
 } from "./state.js";
 import { 
   parseRarity, 
@@ -18,10 +18,13 @@ import {
   priceFor, 
   getRecentSearches, 
   addRecentSearch, 
-  clearRecentSearches 
+  clearRecentSearches,
+  formatDate, 
+  formatDisplayDate,
+  formatLongDate
 } from "./utils.js";
 import { toast } from "./toasts.js";
-import { openDetailsModal, openCalendarModal, openImageZoom } from "./modals.js";
+import { openDetailsModal, openCalendarModal, openImageZoom, closeDetailsModal } from "./modals.js";
 
 const D = getDomElements();
 
@@ -36,7 +39,9 @@ export function renderElementFilterButtons() {
     btn.dataset.state = appElementsState[el];
     btn.innerHTML = `<span class="element-tag-dot"></span><span>${el}</span>`;
     btn.addEventListener("click", () => {
-      // Logic for updating state is in app.js listener
+      toggleElementFilter(btn.dataset.element);
+      btn.dataset.state = getAppState().elements[btn.dataset.element]; // Update dataset state immediately for visual
+      renderCatalogGrid();
     });
     D.elementFilters.appendChild(btn);
   });
@@ -68,10 +73,10 @@ function cardComponent(card) {
         <div class="text-neutral-300 text-sm">${perDay.toLocaleString()} coins / day</div>
         <div class="flex items-center gap-2">
           <button class="details inline-flex items-center justify-center rounded-md border border-neutral-800 h-8 w-8 text-neutral-400 hover:bg-neutral-900 hover:text-neutral-200 transition-colors" aria-label="Show details">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><path d="M12 17h.01"></path></svg>
+            <i class="fa-solid fa-circle-info text-base"></i>
           </button>
           <button class="add-to-cart inline-flex items-center justify-center rounded-md bg-neutral-100 text-neutral-900 h-8 w-8 text-sm font-medium hover:bg-white transition" aria-label="Add to cart">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"></circle><circle cx="20" cy="21" r="1"></circle><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path></svg>
+            <i class="fa-solid fa-cart-shopping text-base"></i>
           </button>
         </div>
       </div>
@@ -150,70 +155,138 @@ export function renderCartItems() {
   const currentCartItems = getCartItems();
 
   if (currentCartItems.length === 0) {
-    D.cartItemsList.innerHTML = `<div class="text-neutral-500 text-center py-4">Your cart is empty.</div>`;
+    D.cartItemsList.innerHTML = `
+      <div class="flex flex-col items-center justify-center text-center h-full text-neutral-500">
+        <i class="fa-solid fa-cart-shopping fa-3x text-neutral-700 mb-3"></i>
+        <h3 class="font-medium text-lg text-neutral-200">Your cart is empty</h3>
+        <p class="text-sm text-neutral-500 mt-1">Add cards from the catalog to get started.</p>
+      </div>`;
     D.cartGrandTotal.textContent = "0 coins";
     D.confirmCheckoutBtn.disabled = true;
     return;
   }
   D.confirmCheckoutBtn.disabled = false;
 
+  const itemsContainer = document.createElement('div');
+  itemsContainer.className = "divide-y divide-neutral-800";
+  
+  // add tip at top
+  const tip = document.createElement('div');
+  tip.className = "text-xs text-neutral-400 mb-3 flex items-center";
+  tip.innerHTML = `<span class="inline-flex items-center gap-1">
+  <i class="fa-solid fa-lightbulb text-sm"></i>
+  Tip:</span>&nbsp;Click the Start date to select from the calendar. Duration is in days.`; 
+  D.cartItemsList.appendChild(tip);
+
   currentCartItems.forEach(item => {
     grandTotal += item.total;
+    const endDateObj = new Date(item.startDate);
+    endDateObj.setDate(endDateObj.getDate() + (parseInt(item.duration, 10) || 1)); // add full duration
+    const endDateStr = formatLongDate(endDateObj);
     const cartItemEl = document.createElement("div");
-    cartItemEl.className = "flex flex-col gap-3 p-3 border border-neutral-800 rounded-md bg-neutral-900";
+    cartItemEl.className = "flex items-start gap-4 py-4";
     cartItemEl.innerHTML = `
-      <div class="flex items-center justify-between">
-        <div>
-          <p class="text-neutral-100 font-medium">${item.name}</p>
-          <p class="text-neutral-500 text-xs">${item.element} • ${item.rarity} • ${item.perDay.toLocaleString()}/d</p>
-        </div>
-        <span class="text-sm text-neutral-300">${item.total.toLocaleString()} coins</span>
-        <button data-uuid="${item.uuid}" class="remove-from-cart text-neutral-400 hover:text-red-400 transition-colors" aria-label="Remove card">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-        </button>
+      <div class="flex-shrink-0 w-16 h-24 rounded-md bg-neutral-900 overflow-hidden flex items-center justify-center">
+        ${item.image
+          ? `<img src="${item.image}" alt="${item.name}" class="w-full h-full object-contain" loading="lazy">`
+          : `<div class="w-full h-full grid place-items-center text-neutral-600 font-bold">${item.name.charAt(0).toUpperCase()}</div>`}
       </div>
-      <div class="grid grid-cols-2 gap-3 text-sm">
-        <label>
-          <span class="block mb-1 text-neutral-400">Start date</span>
-          <input type="text" value="${item.startDate}" data-uuid="${item.uuid}" data-key="startDate" class="cart-item-input w-full rounded-md bg-neutral-950 border border-neutral-800 px-3 py-2 h-9 focus:ring-2 focus:ring-neutral-700/60 date-input" readonly />
-        </label>
-        <label>
-          <span class="block mb-1 text-neutral-400">Duration (days)</span>
-          <input type="number" min="1" max="30" value="${item.duration}" data-uuid="${item.uuid}" data-key="duration" class="cart-item-input w-full rounded-md bg-neutral-950 border border-neutral-800 px-3 py-2 h-9 focus:ring-2 focus:ring-neutral-700/60" />
-        </label>
+
+      <div class="flex-grow flex flex-col justify-between self-stretch">
+        <div>
+          <div class="flex justify-between items-start">
+            <div>
+              <p class="font-medium text-neutral-100">${item.name}</p>
+              <p class="text-sm text-neutral-400">${item.rarity}</p>
+            </div>
+             <button data-uuid="${item.uuid}" class="remove-from-cart text-neutral-500 hover:text-red-400 transition-colors p-1 -mr-1" aria-label="Remove ${item.name} from cart">
+              <i class="fa-solid fa-xmark text-base"></i>
+            </button>
+          </div>
+        </div>
+
+        <div class="flex items-end justify-between">
+          <div class="flex flex-col gap-1">
+            <div class="grid grid-cols-2 gap-3 items-end">
+              <label class="text-sm">
+                <span class="cart-field-label">Start date</span>
+                <input type="text" value="${formatLongDate(new Date(item.startDate))}" data-uuid="${item.uuid}" data-key="startDate" class="cart-input-sm date-input-sm w-36 text-center" readonly aria-label="Start date for ${item.name}"/>
+              </label>
+              <label class="text-sm">
+                <span class="cart-field-label">Duration</span>
+                <div class="flex items-center">
+                  <input type="number" inputmode="numeric" pattern="\\d*" min="1" max="30" value="${item.duration}" data-uuid="${item.uuid}" data-key="duration" class="cart-input-sm w-16 text-center" aria-label="Duration in days for ${item.name}"/>
+                  <span class="cart-duration-label" data-uuid="${item.uuid}">${item.duration === 1 ? 'day' : item.duration + ' days'}</span>
+                </div>
+              </label>
+            </div>
+            <span class="cart-field-help">End date: ${endDateStr}</span>
+          </div>
+          <span class="font-medium text-neutral-200 text-base">${item.total.toLocaleString()} coins</span>
+        </div>
       </div>
     `;
-    D.cartItemsList.appendChild(cartItemEl);
+    itemsContainer.appendChild(cartItemEl);
 
     const startDateInput = cartItemEl.querySelector(`input[data-key="startDate"]`);
     startDateInput.addEventListener("click", (e) => {
       openCalendarModal(e.currentTarget, item.startDate, (selectedDate) => {
-        updateCartItemDetails(item.uuid, "startDate", selectedDate);
-        renderCartItems(); // Re-render cart to update total/item display
+        updateCartItemDetails(item.uuid, "startDate", formatDate(selectedDate, "YYYY-MM-DD"));
+        renderCartItems();
       });
     });
-  });
+  });  
+
+  D.cartItemsList.appendChild(itemsContainer);
 
   D.cartGrandTotal.textContent = `${grandTotal.toLocaleString()} coins`;
 
   D.cartItemsList.querySelectorAll(".remove-from-cart").forEach(btn => {
     btn.addEventListener("click", (e) => {
       removeFromCart(e.currentTarget.dataset.uuid);
-      renderCartItems(); 
+      renderCartItems();
       updateCartDisplayCount();
       toast("Card removed from cart.");
     });
   });
 
-  D.cartItemsList.querySelectorAll(".cart-item-input").forEach(input => {
+  D.cartItemsList.querySelectorAll(".cart-input-sm").forEach(input => {
     if (input.dataset.key === "duration") {
+      // Allow empty input while typing (so backspace works on mobile). Only validate on blur.
       input.addEventListener("input", (e) => {
+        const raw = e.currentTarget.value;
+        // If user cleared field, allow empty string (don't update state yet)
+        if (raw === "" || raw === null) {
+          e.currentTarget.dataset._pending = "true";
+          return;
+        }
+        // otherwise keep the typed value
+        const parsed = parseInt(raw, 10);
+        if (!isNaN(parsed)) {
+          // display but do not force limits until blur
+          e.currentTarget.dataset._pending = "false";
+        }
+      });
+      input.addEventListener("blur", (e) => {
         let value = parseInt(e.currentTarget.value, 10);
         if (isNaN(value) || value < 1) value = 1;
-        if (value > 30) value = 30; 
-        e.currentTarget.value = value; 
+        if (value > 30) value = 30;
+        e.currentTarget.value = value;
+        e.currentTarget.dataset._pending = "false";
         updateCartItemDetails(e.currentTarget.dataset.uuid, "duration", value);
-        renderCartItems(); 
+        renderCartItems();
+      });
+      // allow ArrowUp/ArrowDown to increment/decrement for keyboard users
+      input.addEventListener("keydown", (ev) => {
+        if (ev.key === "ArrowUp" || ev.key === "ArrowDown") {
+          ev.preventDefault();
+          const step = ev.key === "ArrowUp" ? 1 : -1;
+          let cur = parseInt(ev.currentTarget.value, 10);
+          if (isNaN(cur)) cur = 0;
+          cur = Math.min(30, Math.max(1, cur + step));
+          ev.currentTarget.value = cur;
+          ev.currentTarget.dispatchEvent(new Event('blur')); // trigger validation/update
+        }
       });
     }
   });
@@ -242,13 +315,14 @@ export function updateDetailsModalContent(card) {
       <div class="border-t border-neutral-800 pt-4 flex justify-end">
         <button id="add-to-cart-from-details" class="inline-flex items-center gap-2 rounded-md bg-neutral-100 text-neutral-900 px-4 py-2.5 text-sm font-medium hover:bg-white transition">
           Add to Cart
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"></circle><circle cx="20" cy="21" r="1"></circle><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path></svg>
+          <i class="fa-solid fa-cart-shopping text-base"></i>
         </button>
       </div>
     </div>
   `;
   D.detailsDialog.querySelector("#add-to-cart-from-details").addEventListener("click", () => {
     addToCart({ element, name: card.name, rarity, perDay, image, cardId: card.name, details: card.details });
+    closeDetailsModal(); // auto-close info modal so toast is visible
     toast(`Added "${card.name}" to cart.`);
     updateCartDisplayCount();
   });
@@ -265,46 +339,54 @@ export function renderCalendarView(onDayClickCallback) {
   const { currentDate, selectedDate } = getCalendarState();
 
   D.calendarDaysGrid.innerHTML = "";
-  D.calendarMonthYearSpan.textContent = currentDate.format("MMMM YYYY");
+  D.calendarMonthYearSpan.textContent = `${currentDate.toLocaleString('en-US', { month: 'long' })} ${currentDate.getFullYear()}`;
 
-  const startOfMonth = currentDate.startOf("month");
-  const endOfMonth = currentDate.endOf("month");
-  const today = dayjs().startOf("day");
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
 
-  let dayToDisplay = startOfMonth.startOf("week");
+  const firstDayOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+  const startingDayOfWeek = firstDayOfMonth.getDay();
 
-  for (let i = 0; i < 42; i++) { 
+  const dayToDisplay = new Date(firstDayOfMonth);
+  dayToDisplay.setDate(firstDayOfMonth.getDate() - startingDayOfWeek);
+
+  for (let i = 0; i < 42; i++) {
     const dayEl = document.createElement("button");
     dayEl.className = "calendar-day";
-    dayEl.textContent = dayToDisplay.date();
-    dayEl.dataset.date = dayToDisplay.format("YYYY-MM-DD");
+    dayEl.textContent = dayToDisplay.getDate();
+    dayEl.dataset.date = formatDate(dayToDisplay, 'YYYY-MM-DD');
 
-    const currentDayForListener = dayToDisplay.clone();
+    const currentDayForListener = new Date(dayToDisplay);
 
-    if (currentDayForListener.isBefore(today, 'day')) {
+    const isToday = currentDayForListener.toDateString() === today.toDateString();
+    const isSelected = selectedDate && currentDayForListener.toDateString() === selectedDate.toDateString();
+    const isOtherMonth = currentDayForListener.getMonth() !== currentDate.getMonth();
+    
+    const isDisabled = currentDayForListener < today || isOtherMonth;
+
+    if (isDisabled) {
       dayEl.classList.add("calendar-disabled");
       dayEl.disabled = true;
-    } else if (currentDayForListener.isSame(today, 'day')) {
+    } else if (isToday) {
       dayEl.classList.add("calendar-today");
     }
 
-    if (!currentDayForListener.isSame(currentDate, 'month')) {
+    if (isOtherMonth) {
       dayEl.classList.add("calendar-other-month");
-      dayEl.disabled = true; 
     }
 
-    if (selectedDate && currentDayForListener.isSame(selectedDate, 'day')) {
+    if (isSelected) {
       dayEl.classList.add("calendar-selected");
     }
 
     if (!dayEl.disabled) {
       dayEl.addEventListener("click", () => {
-        onDayClickCallback(dayjs(dayEl.dataset.date));
+        onDayClickCallback(currentDayForListener);
       });
     }
 
     D.calendarDaysGrid.appendChild(dayEl);
-    dayToDisplay = dayToDisplay.add(1, 'day');
+    dayToDisplay.setDate(dayToDisplay.getDate() + 1);
   }
 }
 
@@ -313,52 +395,90 @@ export function renderRentalsView() {
   D.rentalsList.innerHTML = "";
 
   if (rentals.length === 0) {
-    D.rentalsList.innerHTML = `<div class="text-neutral-500 text-center py-4">No past rentals found.</div>`;
+    D.rentalsList.innerHTML = `
+    <div class="flex flex-col items-center justify-center text-center py-12 text-neutral-500">
+        <i class="fa-solid fa-clipboard-list fa-3x text-neutral-700 mb-3"></i>
+        <h3 class="font-medium text-lg text-neutral-200">No Rentals Found</h3>
+        <p class="text-sm text-neutral-500 mt-1">You haven't requested any card rentals yet.</p>
+    </div>`;
     return;
   }
 
   rentals.forEach(rental => {
-    const rentalTotal = rental.items.reduce((sum, item) => sum + item.total, 0);
+    // Ensure rental.items is an array, default to empty array if not
+    const rentalItems = Array.isArray(rental.items) ? rental.items : [];
+    const rentalTotal = rentalItems.reduce((sum, item) => sum + item.total, 0);
 
     const rentalEl = document.createElement("div");
-    rentalEl.className = "p-4 border border-neutral-800 rounded-md bg-neutral-900 space-y-3";
-    rentalEl.dataset.rentalId = rental.id; // Add data-rental-id to the main div
+    rentalEl.className = "border border-neutral-800 rounded-lg overflow-hidden rental-accordion-item";
+    rentalEl.dataset.rentalId = rental.id;
+    
+    const formattedTimestamp = formatDisplayDate(new Date(rental.timestamp));
+
     rentalEl.innerHTML = `
-      <div class="flex items-center justify-between text-xs text-neutral-500">
-        <span>Requested on ${dayjs(rental.timestamp).format("MMM D, YYYY h:mm A")}</span>
-        <button data-rental-id="${rental.id}" class="cancel-rental-btn text-neutral-400 hover:text-red-400 transition-colors" aria-label="Cancel rental">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-        </button>
-      </div>
-      <p class="font-medium text-neutral-100">Requested by: ${rental.discordUser}</p>
-      <div class="space-y-2">
-        ${rental.items.map(item => `
-          <div class="flex items-center gap-3">
-            <div class="flex-shrink-0 w-12 h-12 rounded-md bg-transparent p-0.5 flex items-center justify-center overflow-hidden">
-              ${item.image
-                ? `<img src="${item.image}" alt="${item.name}" class="w-full h-full object-contain" loading="lazy">`
-                : `<div class="w-full h-full grid place-items-center text-neutral-600 text-lg font-bold">${item.name.charAt(0).toUpperCase()}</div>`}
-            </div>
-            <div class="flex-grow">
-              <p class="text-neutral-200 font-medium">${item.name}</p>
-              <p class="text-neutral-400 text-xs">${item.startDate} for ${item.duration} days</p>
-            </div>
-            <span class="text-neutral-300 text-sm">${item.total.toLocaleString()} coins</span>
+      <button class="rental-accordion-trigger flex items-center justify-between w-full p-4 text-left bg-neutral-900 hover:bg-neutral-800/60 transition-colors" aria-expanded="false">
+        <div class="flex items-center gap-4">
+          <div class="flex flex-col text-left">
+            <span class="font-medium text-neutral-100">${rental.discordUser}</span>
+            <span class="text-xs text-neutral-400">Requested on ${formattedTimestamp}</span>
           </div>
-        `).join('')}
-      </div>
-      <div class="border-t border-neutral-800 pt-3 flex justify-between items-center text-sm font-medium">
-        <span>Total:</span>
-        <span>${rentalTotal.toLocaleString()} coins</span>
+        </div>
+        <div class="flex items-center gap-4">
+          <span class="text-sm font-medium text-neutral-300">${rentalTotal.toLocaleString()} coins</span>
+          <i class="fa-solid fa-chevron-down rental-accordion-chevron text-lg text-neutral-400 transition-transform duration-200 flex-shrink-0"></i>
+        </div>
+      </button>
+
+      <div class="rental-accordion-content bg-neutral-900/50" style="height: 0px;">
+        <div class="p-4 border-t border-neutral-800">
+            <div class="flex justify-between items-center mb-4">
+                <h4 class="text-sm font-medium text-neutral-300">Rental Details (${rentalItems.length} ${rentalItems.length === 1 ? 'item' : 'items'})</h4>
+                 <button data-rental-id="${rental.id}" class="cancel-rental-btn text-xs inline-flex items-center gap-1.5 text-neutral-400 hover:text-red-400 transition-colors" aria-label="Cancel rental">
+                  <i class="fa-solid fa-xmark text-sm"></i>
+                  Cancel Request
+                </button>
+            </div>
+             <div class="space-y-3">
+              ${rentalItems.map(item => `
+                <div class="flex items-center gap-3 text-xs">
+                  <div class="flex-shrink-0 w-10 h-14 rounded-md bg-neutral-800 p-0.5 flex items-center justify-center overflow-hidden">
+                    ${item.image
+                      ? `<img src="${item.image}" alt="${item.name}" class="w-full h-full object-contain" loading="lazy">`
+                      : `<div class="w-full h-full grid place-items-center text-neutral-600 font-bold">${item.name.charAt(0).toUpperCase()}</div>`}
+                  </div>
+                  <div class="flex-grow">
+                    <p class="text-neutral-200 font-medium text-sm">${item.name}</p>
+                    <p class="text-neutral-400">${formatLongDate(new Date(item.startDate))} for ${item.duration === 1 ? 'day' : item.duration + ' days'}</p>
+                  </div>
+                  <span class="text-neutral-300 font-medium">${item.total.toLocaleString()} coins</span>
+                </div>
+              `).join('')}
+            </div>
+        </div>
       </div>
     `;
     D.rentalsList.appendChild(rentalEl);
   });
 
+  D.rentalsList.querySelectorAll('.rental-accordion-trigger').forEach(trigger => {
+    trigger.addEventListener('click', () => {
+      const content = trigger.nextElementSibling;
+      const isExpanded = trigger.getAttribute('aria-expanded') === 'true';
+
+      trigger.setAttribute('aria-expanded', !isExpanded);
+      if (!isExpanded) {
+        content.style.height = `${content.scrollHeight}px`;
+      } else {
+        content.style.height = '0px';
+      }
+    });
+  });
+
   D.rentalsList.querySelectorAll(".cancel-rental-btn").forEach(button => {
     button.addEventListener("click", (e) => {
+      e.stopPropagation();
       const rentalId = e.currentTarget.dataset.rentalId;
-      const rentalDomElement = e.currentTarget.closest(".p-4.border");
+      const rentalDomElement = e.currentTarget.closest(".rental-accordion-item");
       if (rentalDomElement) {
         animateAndRemoveRental(rentalId, rentalDomElement);
       }
@@ -481,27 +601,25 @@ export function renderSearchSuggestions() {
     const itemEl = document.createElement("div");
     itemEl.className = "suggest-item";
     itemEl.dataset.value = itemText;
+    let iconClass = '';
     let displayHtml = '';
-    let iconSvg = '';
     const isCardSuggestion = allDetailedCardsMap.has(itemText);
     
     if (isCardSuggestion) {
       const cardDetails = allDetailedCardsMap.get(itemText);
-      iconSvg = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="opacity-60 text-neutral-400"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path></svg>`;
+      iconClass = `fa-solid fa-magnifying-glass text-sm opacity-60 text-neutral-400`;
       displayHtml = `
         <span class="flex-grow">${highlightMatch(itemText, query)}</span>
         <span class="element-badge element-badge-${cardDetails.element.toLowerCase()} rounded-full px-2 py-0.5 text-xs font-medium">${cardDetails.element}</span>
         <span class="suggest-tag">${cardDetails.rarity}</span>
       `;
     } else { // It's a pure recent search or "search for query" option
-      iconSvg = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="opacity-60 text-neutral-400">
-                    <path d="M13 10H3M21 10H17"></path><path d="M13 16H3M21 16H17"></path><path d="M14 7l-3-3-3 3"></path><path d="M11 20l3-3-3-3"></path>
-                  </svg>`;
+      iconClass = `fa-solid fa-clock-rotate-left text-sm opacity-60 text-neutral-400`;
       displayHtml = `<span>${highlightMatch(itemText, query)}</span>`;
     }
     
     itemEl.innerHTML = `
-      ${iconSvg}
+      <i class="${iconClass}"></i>
       ${displayHtml}
       <span class="suggest-kbd">↵</span>
     `;
@@ -527,7 +645,7 @@ export function renderSearchSuggestions() {
     searchOptionEl.className = "suggest-item border-t border-neutral-800";
     searchOptionEl.dataset.value = query; 
     searchOptionEl.innerHTML = `
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="opacity-60 text-neutral-400"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path></svg>
+      <i class="fa-solid fa-magnifying-glass text-sm opacity-60 text-neutral-400"></i>
       <span>Search for "<span class="font-medium text-white">${query}</span>"</span>
       <span class="suggest-kbd">↵</span>
     `;
