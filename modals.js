@@ -1,9 +1,9 @@
-import dayjs from "dayjs";
 import { getDomElements } from "./domElements.js";
 import { getCalendarState, getCartItems, getCurrentDetailsCard, setCalendarActiveInput, setCalendarOnSelectCallback, setCurrentCalendarMonth, setSelectedDateInCalendar, resetCalendarState, clearCart, recordRental } from "./state.js";
 import { renderCartItems, updateDetailsModalContent, renderCalendarView, renderRentalsView, updateCartDisplayCount } from "./renderers.js";
 import { toast } from "./toasts.js";
 import { sendDiscordWebhook } from "./webhooks.js";
+import { formatDate } from "./utils.js"; // Import new utility
 
 const D = getDomElements();
 
@@ -62,14 +62,17 @@ export function openCalendarModal(inputElement, currentSelectedDate, onSelectCal
   setCalendarActiveInput(inputElement);
   setCalendarOnSelectCallback(onSelectCallback);
 
-  let parsedDate = dayjs(currentSelectedDate);
-  if (!parsedDate.isValid()) {
-    parsedDate = dayjs(); // Fallback to today
+  // currentSelectedDate can be a "YYYY-MM-DD" string or a Date object
+  let parsedDate = new Date(currentSelectedDate);
+  // Check if parsedDate is a valid date (e.g., if currentSelectedDate was an invalid string)
+  if (isNaN(parsedDate.getTime())) {
+    parsedDate = new Date(); // Fallback to today
     console.warn(`Invalid date string "${currentSelectedDate}". Falling back to today's date.`);
   }
+  parsedDate.setHours(0,0,0,0); // Normalize to start of day
 
   setSelectedDateInCalendar(parsedDate);
-  setCurrentCalendarMonth(parsedDate);
+  setCurrentCalendarMonth(parsedDate); // Sets currentDate in state to the first day of that month
 
   // Pass handleDateClick as a callback to renderCalendarView
   renderCalendarView(handleDateClick); 
@@ -89,12 +92,12 @@ export function closeCalendarModal() {
   }, { once: true });
 }
 
-export function handleDateClick(date) {
+export function handleDateClick(date) { // date is now a Date object
   const { onSelectCallback, activeInput } = getCalendarState();
   setSelectedDateInCalendar(date); 
   if (onSelectCallback) {
-    const formattedDate = date.format("YYYY-MM-DD");
-    onSelectCallback(formattedDate); 
+    const formattedDate = formatDate(date, "YYYY-MM-DD");
+    onSelectCallback(date); // Pass the Date object to the callback
     if (activeInput) {
       activeInput.value = formattedDate; // Directly update the input element's value
     }
@@ -127,7 +130,7 @@ export async function handleConfirmCheckout() {
   }
 }
 
-// New: Image zoom functionality
+// Image zoom functionality
 export function openImageZoom(src) {
   // Clear previous image src to prevent flashing old image
   D.imageZoomImg.src = ''; 
@@ -187,7 +190,7 @@ export function setupDialogCloseListeners() {
     { element: D.checkoutDialog, closeFn: closeCheckoutModal, className: "checkout-dialog-closing" },
     { element: D.rentalsDrawer, closeFn: closeRentalsDrawer, className: "rentals-drawer-closing" },
     { element: D.calendarDialog, closeFn: closeCalendarModal, className: "calendar-dialog-closing" },
-    // New: Image Zoom Dialog added to the list of dialogs
+    // Image Zoom Dialog added to the list of dialogs
     { element: D.imageZoomDialog, closeFn: closeImageZoom, className: "image-zoom-dialog-closing" }
   ];
 
@@ -202,4 +205,3 @@ export function setupDialogCloseListeners() {
       closeFn();
     });
   });
-}
