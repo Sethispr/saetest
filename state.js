@@ -1,6 +1,5 @@
-import dayjs from "dayjs";
 import { ELEMENTS } from "./data.js";
-import { addRentalToLocalStorage, removeRentalFromLocalStorage, getRentalsFromLocalStorage } from "./utils.js";
+import { addRentalToLocalStorage, removeRentalFromLocalStorage, getRentalsFromLocalStorage, formatDate } from "./utils.js";
 
 const appState = {
   elements: ELEMENTS.reduce((acc, el) => ({ ...acc, [el]: 0 }), {}),
@@ -12,7 +11,7 @@ let cartItems = [];
 let currentDetailsCard = null;
 
 let calendarState = {
-  currentDate: dayjs(), // For calendar navigation
+  currentDate: new Date(), // Use native Date object
   activeInput: null,    // The input element that triggered the calendar
   onSelectCallback: null, // Callback to update the input's value
   selectedDate: null,   // The date selected by the user in the calendar
@@ -47,7 +46,7 @@ export function addToCart(card) {
   cartItems.push({
     ...card,
     uuid: crypto.randomUUID(),
-    startDate: dayjs().format("YYYY-MM-DD"),
+    startDate: formatDate(new Date(), "YYYY-MM-DD"), // Format new Date()
     duration: 1,
     total: card.perDay,
   });
@@ -66,6 +65,7 @@ export function updateCartItemDetails(uuid, key, value) {
       if (key === "duration") {
         item.duration = Math.max(1, Math.min(30, parseInt(value, 10) || 1));
       }
+      // Recalculate total if duration or start date changes
       item.total = item.duration * item.perDay;
     }
     cartItems[itemIndex] = item;
@@ -85,20 +85,26 @@ export function setCalendarOnSelectCallback(callback) {
 }
 
 export function setCurrentCalendarMonth(date) {
-  calendarState.currentDate = date.startOf("month");
+  // Ensure we set to the first day of the month to keep consistent reference
+  const newDate = new Date(date);
+  newDate.setDate(1); 
+  calendarState.currentDate = newDate;
 }
 
 export function setSelectedDateInCalendar(date) {
-  calendarState.selectedDate = date;
+  const newDate = new Date(date);
+  newDate.setHours(0, 0, 0, 0); // Normalize to start of day for accurate comparison
+  calendarState.selectedDate = newDate;
 }
 
 export function resetCalendarState() {
   calendarState = {
-    currentDate: dayjs(),
+    currentDate: new Date(),
     activeInput: null,
     onSelectCallback: null,
     selectedDate: null,
   };
+  calendarState.currentDate.setDate(1); // Set to first day of current month
 }
 
 export function setCurrentDetailsCard(card) {
